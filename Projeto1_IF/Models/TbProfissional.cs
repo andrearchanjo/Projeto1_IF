@@ -17,12 +17,15 @@ public partial class TbProfissional
     [Key]
     public int IdProfissional { get; set; }
 
+    [Display(Name = "Área de Atuação")]
     public int? IdTipoProfissional { get; set; }
 
     public int IdContrato { get; set; }
 
+    [Display(Name = "Tipo de Acesso")]
     public int? IdTipoAcesso { get; set; }
 
+    [Display(Name = "Cidade")]
     public int IdCidade { get; set; }
 
     [Required]
