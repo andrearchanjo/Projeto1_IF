@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -39,6 +40,7 @@ namespace Projeto1_IF.Controllers
                 .Include(t => t.IdCidadeNavigation)
                 .Include(t => t.IdContratoNavigation)
                 .Include(t => t.IdTipoAcessoNavigation)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(m => m.IdProfissional == id);
             if (tbProfissional == null)
             {
@@ -63,26 +65,35 @@ namespace Projeto1_IF.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("IdTipoProfissional,IdTipoAcesso,IdCidade,IdUser,Nome,Cpf,CrmCrn,Especialidade,Logradouro,Numero,Bairro,Cep,Cidade,Estado,Ddd1,Ddd2,Telefone1,Telefone2,Salario")] TbProfissional tbProfissional, [Bind("IdPlano")] TbContrato IdContratoNavigation)
+        public async Task<IActionResult> Create([Bind("IdTipoProfissional,IdTipoAcesso,IdCidade,IdUser,Nome,Cpf,CrmCrn,Especialidade,Logradouro,Numero,Bairro,Cep,Ddd1,Ddd2,Telefone1,Telefone2,Salario")] TbProfissional tbProfissional, [Bind("IdPlano")] TbContrato IdContratoNavigation)
         {
-            ModelState.Remove("IdUser");
-            if (ModelState.IsValid)
+            try
             {
-                IdContratoNavigation.DataInicio = DateTime.UtcNow;
-                IdContratoNavigation.DataFim = IdContratoNavigation.DataInicio.Value.AddMonths(1);
-                _context.Add(IdContratoNavigation);
-                await _context.SaveChangesAsync();
+                ModelState.Remove("IdUser");
+                ModelState.Remove("IdContrato");
 
-                var userManager = HttpContext.RequestServices.GetService<UserManager<IdentityUser>>();
-                if (userManager != null)
+                if (ModelState.IsValid)
                 {
-                    var email = User.Identity?.Name;
-                    if (email != null)
+                    IdContratoNavigation.DataInicio = DateTime.UtcNow;
+                    IdContratoNavigation.DataFim = IdContratoNavigation.DataInicio.Value.AddMonths(1);
+                    _context.Add(IdContratoNavigation);
+                    await _context.SaveChangesAsync();
+
+                    var userManager = HttpContext.RequestServices.GetService<UserManager<IdentityUser>>();
+                    if (userManager != null)
                     {
-                        var user = await userManager.FindByEmailAsync(email);
-                        if (user != null)
+                        var email = User.Identity?.Name;
+                        if (email != null)
                         {
-                            tbProfissional.IdUser = user.Id;
+                            var user = await userManager.FindByEmailAsync(email);
+                            if (user != null)
+                            {
+                                tbProfissional.IdUser = user.Id;
+                            }
+                            else
+                            {
+                                return NotFound();
+                            }
                         }
                         else
                         {
@@ -93,21 +104,23 @@ namespace Projeto1_IF.Controllers
                     {
                         return NotFound();
                     }
-                }
-                else
-                {
-                    return NotFound();
-                }
 
-                tbProfissional.IdContrato = IdContratoNavigation.IdContrato;
-                _context.Add(tbProfissional);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
+                    tbProfissional.IdContrato = IdContratoNavigation.IdContrato;
+                    _context.Add(tbProfissional);
+                    await _context.SaveChangesAsync();
+                    return RedirectToAction(nameof(Index));
+                }
+            } catch (DbUpdateException dex)
+            {
+                ModelState.AddModelError("", "Incapaz de salvar. " + dex.ToString());
+            } catch (Exception ex)
+            {
+                ModelState.AddModelError("", "Erro geral. " + ex.ToString());
             }
-
-            ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "Nome");
-            ViewData["IdPlano"] = new SelectList(_context.TbPlano, "IdPlano", "Nome");
-            ViewData["IdTipoAcesso"] = new SelectList(_context.TbTipoAcesso, "IdTipoAcesso", "Nome");
+            
+            ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "Nome", tbProfissional.IdCidade);
+            ViewData["IdPlano"] = new SelectList(_context.TbPlano, "IdPlano", "Nome", IdContratoNavigation.IdPlano);
+            ViewData["IdTipoAcesso"] = new SelectList(_context.TbTipoAcesso, "IdTipoAcesso", "Nome", tbProfissional.IdTipoAcesso);
             return View(tbProfissional);
         }
 
@@ -116,16 +129,17 @@ namespace Projeto1_IF.Controllers
         {
             if (id == null)
             {
-                return NotFound();
+                return RedirectToAction("Erro", "Home");
             }
 
-            var tbProfissional = await _context.TbProfissional.FindAsync(id);
+            var tbProfissional = await _context.TbProfissional.Include(t => t.IdContratoNavigation).FirstOrDefaultAsync(s => s.IdProfissional == id);
             if (tbProfissional == null)
             {
                 return NotFound();
             }
-            ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "IdCidade", tbProfissional.IdCidade);
-            ViewData["IdContrato"] = new SelectList(_context.TbContrato, "IdContrato", "IdContrato", tbProfissional.IdContrato);
+
+            ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "Nome", tbProfissional.IdCidade);
+            ViewData["IdContrato"] = new SelectList(_context.TbPlano, "IdPlano", "Nome", tbProfissional.IdContratoNavigation.IdPlano);
             ViewData["IdTipoAcesso"] = new SelectList(_context.TbTipoAcesso, "IdTipoAcesso", "Nome", tbProfissional.IdTipoAcesso);
             return View(tbProfissional);
         }
@@ -133,43 +147,51 @@ namespace Projeto1_IF.Controllers
         // POST: TbProfissionais/Edit/5
         // To protect from overposting attacks, enable the specific properties you want to bind to.
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
+        [HttpPost, ActionName("Edit")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("IdProfissional,IdTipoProfissional,IdContrato,IdTipoAcesso,IdCidade,IdUser,Nome,Cpf,CrmCrn,Especialidade,Logradouro,Numero,Bairro,Cep,Cidade,Estado,Ddd1,Ddd2,Telefone1,Telefone2,Salario")] TbProfissional tbProfissional)
+        public async Task<IActionResult> EditPost(int? id)
         {
-            if (id != tbProfissional.IdProfissional)
+            if (id == null)
             {
                 return NotFound();
             }
 
-            if (ModelState.IsValid)
+            var tbProfissional = await _context.TbProfissional.Include(t => t.IdContratoNavigation).FirstOrDefaultAsync(s => s.IdProfissional == id);
+            if ( tbProfissional == null)
+            {
+                return NotFound();
+            }
+
+            if (await TryUpdateModelAsync<TbProfissional>(
+                tbProfissional,
+                "",
+                s => s.IdProfissional, s => s.IdTipoAcesso, s => s.IdCidade, s => s.Nome, s => s.Cpf, s => s.CrmCrn,
+                s => s.Especialidade, s => s.Logradouro, s => s.Numero, s => s.Bairro, s => s.Cep,
+                s => s.Ddd1, s => s.Ddd2, s => s.Telefone1, s => s.Telefone2, s => s.Salario))
             {
                 try
                 {
-                    _context.Update(tbProfissional);
                     await _context.SaveChangesAsync();
+                    return RedirectToAction(nameof(Index));
                 }
-                catch (DbUpdateConcurrencyException)
+                catch (DbUpdateException /* ex */)
                 {
-                    if (!TbProfissionalExists(tbProfissional.IdProfissional))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
+                    //Log the error (uncomment ex variable name and write a log.)
+                    ModelState.AddModelError("", "Unable to save changes. " +
+                        "Try again, and if the problem persists, " +
+                        "see your system administrator.");
                 }
-                return RedirectToAction(nameof(Index));
             }
-            ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "IdCidade", tbProfissional.IdCidade);
-            ViewData["IdContrato"] = new SelectList(_context.TbContrato, "IdContrato", "IdContrato", tbProfissional.IdContrato);
+
+            ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "Nome", tbProfissional.IdCidade);
+            ViewData["IdContrato"] = new SelectList(_context.TbPlano, "IdPlano", "Nome", tbProfissional.IdContratoNavigation.IdPlano);
             ViewData["IdTipoAcesso"] = new SelectList(_context.TbTipoAcesso, "IdTipoAcesso", "Nome", tbProfissional.IdTipoAcesso);
+
             return View(tbProfissional);
         }
 
         // GET: TbProfissionais/Delete/5
-        public async Task<IActionResult> Delete(int? id)
+        public async Task<IActionResult> Delete(int? id, bool? saveChangesError = false)
         {
             if (id == null)
             {
@@ -178,12 +200,23 @@ namespace Projeto1_IF.Controllers
 
             var tbProfissional = await _context.TbProfissional
                 .Include(t => t.IdCidadeNavigation)
-                .Include(t => t.IdContratoNavigation)
+                .ThenInclude(s => s.IdEstadoNavigation)
                 .Include(t => t.IdTipoAcessoNavigation)
+                .Include(t => t.IdContratoNavigation)
+                .ThenInclude(s => s.IdPlanoNavigation)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(m => m.IdProfissional == id);
+
             if (tbProfissional == null)
             {
                 return NotFound();
+            }
+
+            if (saveChangesError.GetValueOrDefault())
+            {
+                ViewData["ErrorMessage"] =
+                    "Delete failed. Try again, and if the problem persists " +
+                    "see your system administrator.";
             }
 
             return View(tbProfissional);
@@ -195,13 +228,22 @@ namespace Projeto1_IF.Controllers
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var tbProfissional = await _context.TbProfissional.FindAsync(id);
-            if (tbProfissional != null)
+            if (tbProfissional == null)
             {
-                _context.TbProfissional.Remove(tbProfissional);
+                return RedirectToAction(nameof(Index));
             }
 
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+            try
+            {
+                _context.TbProfissional.Remove(tbProfissional);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Index));
+            }
+            catch (DbUpdateException /* ex */)
+            {
+                //Log the error (uncomment ex variable name and write a log.)
+                return RedirectToAction(nameof(Delete), new { id = id, saveChangesError = true });
+            }
         }
 
         private bool TbProfissionalExists(int id)

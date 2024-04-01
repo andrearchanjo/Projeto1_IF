@@ -18,6 +18,7 @@ public partial class TbPlano
     [Required]
     [StringLength(100)]
     [Unicode(false)]
+    [Display(Name = "Plano")]
     public string Nome { get; set; }
 
     public int Validade { get; set; }
