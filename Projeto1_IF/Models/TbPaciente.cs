@@ -18,65 +18,82 @@ public partial class TbPaciente
     [Required]
     [StringLength(100)]
     [Unicode(false)]
+    [Display(Name = "Nome")]
     public string Nome { get; set; }
 
     [Required]
     [Column("RG")]
     [StringLength(15)]
     [Unicode(false)]
+    [Display(Name = "RG")]
     public string Rg { get; set; }
 
     [Required]
     [Column("CPF")]
     [StringLength(15)]
     [Unicode(false)]
+    [Display(Name = "CPF")]
     public string Cpf { get; set; }
 
+    [Display(Name = "Dt. de Nasc.")]
     public DateOnly DataNascimento { get; set; }
 
     [StringLength(100)]
     [Unicode(false)]
+    [Display(Name = "Responsável")]
     public string NomeResponsavel { get; set; }
 
     [Required]
     [StringLength(1)]
     [Unicode(false)]
+    [Display(Name = "Gênero")]
     public string Sexo { get; set; }
 
+    [Display(Name = "Etnia")]
     public int Etnia { get; set; }
 
     [StringLength(100)]
     [Unicode(false)]
+    [Display(Name = "Endereço")]
     public string Endereco { get; set; }
 
     [StringLength(50)]
     [Unicode(false)]
+    [Display(Name = "Bairro")]
     public string Bairro { get; set; }
 
+    [Display(Name = "Cidade")]
     public int? IdCidade { get; set; }
 
     [StringLength(25)]
     [Unicode(false)]
+    [Display(Name = "Telefone")]
     public string TelResidencial { get; set; }
 
     [StringLength(25)]
     [Unicode(false)]
+    [Display(Name = "Comercial")]
     public string TelComercial { get; set; }
 
     [StringLength(25)]
     [Unicode(false)]
+    [Display(Name = "Celular")]
     public string TelCelular { get; set; }
 
     [StringLength(30)]
     [Unicode(false)]
+    [Display(Name = "Profissão")]
     public string Profissao { get; set; }
 
+    [Display(Name = "Atleta")]
     public bool? FlgAtleta { get; set; }
 
+    [Display(Name = "Gestante")]
     public bool? FlgGestante { get; set; }
 
     [ForeignKey("IdCidade")]
     [InverseProperty("TbPaciente")]
+    [Display(Name = "Cidade")]
     public virtual TbCidade IdCidadeNavigation { get; set; }
 
     [InverseProperty("IdPacienteNavigation")]
