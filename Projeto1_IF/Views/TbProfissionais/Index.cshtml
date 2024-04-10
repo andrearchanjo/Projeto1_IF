@@ -1,4 +1,4 @@
-﻿@model IEnumerable<Projeto1_IF.Models.TbProfissional>
+﻿@model IEnumerable<Projeto1_IF.Models.ProfissionalResumido>
 
 @{
     ViewData["Title"] = "Index";
@@ -14,13 +14,10 @@
     <thead>
         <tr>
             <th>
-                @Html.DisplayNameFor(model => model.IdTipoProfissional)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.IdUser)
-            </th>
-            <th>
                 @Html.DisplayNameFor(model => model.Nome)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.NomePlano)
             </th>
             <th>
                 @Html.DisplayNameFor(model => model.Cpf)
@@ -30,6 +27,9 @@
             </th>
             <th>
                 @Html.DisplayNameFor(model => model.Especialidade)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.NomeCidade)
             </th>
             <th>
                 @Html.DisplayNameFor(model => model.Logradouro)
@@ -58,15 +58,6 @@
             <th>
                 @Html.DisplayNameFor(model => model.Salario)
             </th>
-            <th>
-                @Html.DisplayNameFor(model => model.IdCidadeNavigation)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.IdContratoNavigation)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.IdTipoAcessoNavigation)
-            </th>
             <th></th>
         </tr>
     </thead>
@@ -74,13 +65,10 @@
 @foreach (var item in Model) {
         <tr>
             <td>
-                @Html.DisplayFor(modelItem => item.IdTipoProfissional)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.IdUser)
-            </td>
-            <td>
                 @Html.DisplayFor(modelItem => item.Nome)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.NomePlano)
             </td>
             <td>
                 @Html.DisplayFor(modelItem => item.Cpf)
@@ -90,6 +78,9 @@
             </td>
             <td>
                 @Html.DisplayFor(modelItem => item.Especialidade)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.NomeCidade)
             </td>
             <td>
                 @Html.DisplayFor(modelItem => item.Logradouro)
@@ -119,20 +110,20 @@
                 @Html.DisplayFor(modelItem => item.Salario)
             </td>
             <td>
-                @Html.DisplayFor(modelItem => item.IdCidadeNavigation.IdCidade)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.IdContratoNavigation.IdContrato)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.IdTipoAcessoNavigation.Nome)
-            </td>
-            <td>
-                <a asp-action="Edit" asp-route-id="@item.IdProfissional">Editar</a> |
-                <a asp-action="Details" asp-route-id="@item.IdProfissional">Detalhes</a> |
-                <a asp-action="Delete" asp-route-id="@item.IdProfissional">Excluir</a>
+                <a asp-action="Edit" asp-route-id="@item.IdProfissional" class="btn btn-primary">Editar</a> |
+                <a asp-action="Details" asp-route-id="@item.IdProfissional" class="btn btn-primary">Detalhes</a> |
+                <a asp-action="Delete" asp-route-id="@item.IdProfissional" class="btn btn-primary">Excluir</a>
             </td>
         </tr>
 }
     </tbody>
 </table>
+
+@* @if (Model.Count() > 1)
+{
+    <ol class="nav nav-pills">
+        <li class="nav-item">
+            <a asp-action="Delete" asp-route-id="@Model.First().IdProfissional" class="btn btn-primary">><i class="bi-alarm"></i>Delete</a>
+        </li>
+    </ol>
+} *@

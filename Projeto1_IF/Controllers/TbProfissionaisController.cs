@@ -12,6 +12,7 @@ using Projeto1_IF.Models;
 
 namespace Projeto1_IF.Controllers
 {
+    [Authorize]
     public class TbProfissionaisController : Controller
     {
         private readonly db_IFContext _context;
@@ -21,11 +22,86 @@ namespace Projeto1_IF.Controllers
             _context = context;
         }
 
+        public enum Plano
+        {
+            MedicoTotal = 1,
+            MedicoParcial = 2,
+            Nutricionista = 3,
+        }
+
         // GET: TbProfissionais
+        [Authorize(Roles = "GerenteMedico, GerenteNutricionista")]
+        //[Authorize(Roles = "Medico, Nutricionista")]
         public async Task<IActionResult> Index()
         {
-            var db_IFContext = _context.TbProfissional.Include(t => t.IdCidadeNavigation).Include(t => t.IdContratoNavigation).Include(t => t.IdTipoAcessoNavigation);
-            return View(await db_IFContext.ToListAsync());
+            // Método 1
+            if (User.IsInRole("GerenteMedico")) {
+                var db_IFContext = _context.TbProfissional
+                    .Where(t => (Plano)t.IdContratoNavigation.IdPlano == Plano.MedicoTotal || (Plano)t.IdContratoNavigation.IdPlano == Plano.MedicoParcial)
+                    .Select(pro => new ProfissionalResumido
+                    {
+                        IdProfissional = pro.IdProfissional,
+                        Nome = pro.Nome,
+                        NomeCidade = pro.IdCidadeNavigation.Nome,
+                        NomePlano = pro.IdContratoNavigation.IdPlanoNavigation.Nome,
+                        Cpf = pro.Cpf,
+                        Especialidade = pro.Especialidade,
+                        Logradouro = pro.Logradouro,
+                        Numero = pro.Numero,
+                        Bairro = pro.Bairro,
+                        Cep = pro.Cep,
+                        Ddd1 = pro.Ddd1,
+                        Ddd2 = pro.Ddd2,
+                        Telefone1 = pro.Telefone1,
+                        Telefone2 = pro.Telefone2,
+                        Salario = pro.Salario,
+                    });
+
+                return View(db_IFContext);
+
+
+                // Método 2
+                //var db_IFContext = (from pro in _context.TbProfissional
+                //                    where (Plano)pro.IdContratoNavigation.IdPlano == Plano.MedicoTotal
+                //                    select pro)
+                //                        .Include(t => t.IdTipoAcessoNavigation)
+                //                        .Include(t => t.IdCidadeNavigation)
+                //                        .Include(pro => pro.IdContratoNavigation)
+                //                            .ThenInclude(contrato => contrato.IdPlanoNavigation);
+
+                // Método 3
+                //var db_IFContext = from pro in _context.TbProfissional
+                //                   join contrato in _context.TbContrato on pro.IdContrato equals contrato.IdContrato
+                //                   join plano in _context.TbPlano on contrato.IdPlano equals plano.IdPlano
+                //                   where plano.IdPlano == 1
+                //                   select pro;
+            }
+            else { 
+                if (User.IsInRole("GerenteNutricionista")) {
+                    var db_IFContext2 = (from pro in _context.TbProfissional
+                                         where (Plano)pro.IdContratoNavigation.IdPlano == Plano.Nutricionista
+                                         select new ProfissionalResumido
+                                    {
+                                        IdProfissional = pro.IdProfissional,
+                                        Nome = pro.Nome,
+                                        NomeCidade = pro.IdCidadeNavigation.Nome,
+                                        NomePlano = pro.IdContratoNavigation.IdPlanoNavigation.Nome,
+                                        Cpf = pro.Cpf,
+                                        Especialidade = pro.Especialidade,
+                                        Logradouro = pro.Logradouro,
+                                        Numero = pro.Numero,
+                                        Bairro = pro.Bairro,
+                                        Cep = pro.Cep,
+                                        Ddd1 = pro.Ddd1,
+                                        Ddd2 = pro.Ddd2,
+                                        Telefone1 = pro.Telefone1,
+                                        Telefone2 = pro.Telefone2,
+                                        Salario = pro.Salario,
+                                    });
+                        return View(await db_IFContext2.ToListAsync());
+                }
+            }
+            return View();
         }
 
         // GET: TbProfissionais/Details/5
@@ -50,7 +126,6 @@ namespace Projeto1_IF.Controllers
             return View(tbProfissional);
         }
 
-        [Authorize]
         // GET: TbProfissionais/Create
         public IActionResult Create()
         {
@@ -71,7 +146,6 @@ namespace Projeto1_IF.Controllers
             {
                 ModelState.Remove("IdUser");
                 ModelState.Remove("IdContrato");
-
                 if (ModelState.IsValid)
                 {
                     IdContratoNavigation.DataInicio = DateTime.UtcNow;
