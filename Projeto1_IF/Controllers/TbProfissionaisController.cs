@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Security.Principal;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Projeto1_IF.Data;
 using Projeto1_IF.Models;
 
 namespace Projeto1_IF.Controllers
@@ -16,10 +18,18 @@ namespace Projeto1_IF.Controllers
     public class TbProfissionaisController : Controller
     {
         private readonly db_IFContext _context;
+        private readonly ApplicationDbContext _identity;
+        private readonly UserManager<IdentityUser> _userManager;
 
-        public TbProfissionaisController(db_IFContext context)
+        public TbProfissionaisController(
+            db_IFContext context, 
+            UserManager<IdentityUser> userManager,
+            ApplicationDbContext identity
+        )
         {
             _context = context;
+            _userManager = userManager;
+            _identity = identity;
         }
 
         public enum Plano
@@ -30,84 +40,97 @@ namespace Projeto1_IF.Controllers
         }
 
         // GET: TbProfissionais
-        [Authorize(Roles = "GerenteMedico, GerenteNutricionista")]
-        //[Authorize(Roles = "Medico, Nutricionista")]
+        [Authorize(Roles = "Medico, Nutricionista, GerenteGeral, GerenteMedico, GerenteNutricionista")]
         public async Task<IActionResult> Index()
         {
-            // Método 1
-            if (User.IsInRole("GerenteMedico")) {
-                var db_IFContext = _context.TbProfissional
-                    .Where(t => (Plano)t.IdContratoNavigation.IdPlano == Plano.MedicoTotal || (Plano)t.IdContratoNavigation.IdPlano == Plano.MedicoParcial)
-                    .Select(pro => new ProfissionalResumido
-                    {
-                        IdProfissional = pro.IdProfissional,
-                        Nome = pro.Nome,
-                        NomeCidade = pro.IdCidadeNavigation.Nome,
-                        NomePlano = pro.IdContratoNavigation.IdPlanoNavigation.Nome,
-                        Cpf = pro.Cpf,
-                        Especialidade = pro.Especialidade,
-                        Logradouro = pro.Logradouro,
-                        Numero = pro.Numero,
-                        Bairro = pro.Bairro,
-                        Cep = pro.Cep,
-                        Ddd1 = pro.Ddd1,
-                        Ddd2 = pro.Ddd2,
-                        Telefone1 = pro.Telefone1,
-                        Telefone2 = pro.Telefone2,
-                        Salario = pro.Salario,
-                    });
+            var usuario = await _userManager.GetUserAsync(User);
 
-                return View(db_IFContext);
-
-
-                // Método 2
-                //var db_IFContext = (from pro in _context.TbProfissional
-                //                    where (Plano)pro.IdContratoNavigation.IdPlano == Plano.MedicoTotal
-                //                    select pro)
-                //                        .Include(t => t.IdTipoAcessoNavigation)
-                //                        .Include(t => t.IdCidadeNavigation)
-                //                        .Include(pro => pro.IdContratoNavigation)
-                //                            .ThenInclude(contrato => contrato.IdPlanoNavigation);
-
-                // Método 3
-                //var db_IFContext = from pro in _context.TbProfissional
-                //                   join contrato in _context.TbContrato on pro.IdContrato equals contrato.IdContrato
-                //                   join plano in _context.TbPlano on contrato.IdPlano equals plano.IdPlano
-                //                   where plano.IdPlano == 1
-                //                   select pro;
+            if (usuario == null)
+            {
+                return View();
             }
-            else { 
-                if (User.IsInRole("GerenteNutricionista")) {
-                    var db_IFContext2 = (from pro in _context.TbProfissional
-                                         where (Plano)pro.IdContratoNavigation.IdPlano == Plano.Nutricionista
-                                         select new ProfissionalResumido
-                                    {
-                                        IdProfissional = pro.IdProfissional,
-                                        Nome = pro.Nome,
-                                        NomeCidade = pro.IdCidadeNavigation.Nome,
-                                        NomePlano = pro.IdContratoNavigation.IdPlanoNavigation.Nome,
-                                        Cpf = pro.Cpf,
-                                        Especialidade = pro.Especialidade,
-                                        Logradouro = pro.Logradouro,
-                                        Numero = pro.Numero,
-                                        Bairro = pro.Bairro,
-                                        Cep = pro.Cep,
-                                        Ddd1 = pro.Ddd1,
-                                        Ddd2 = pro.Ddd2,
-                                        Telefone1 = pro.Telefone1,
-                                        Telefone2 = pro.Telefone2,
-                                        Salario = pro.Salario,
-                                    });
-                        return View(await db_IFContext2.ToListAsync());
+
+            var roles = await _userManager.GetRolesAsync(usuario);
+
+            IQueryable<TbProfissional> db_IFContext = _context.TbProfissional.AsQueryable();
+
+            if (roles.Contains("GerenteGeral"))
+            {
+            }
+            else if (roles.Contains("GerenteMedico"))
+            {
+                var nutricionistaIds = await GetUsersIdsByRoleNameAsync("Medico");
+
+                if (nutricionistaIds != null)
+                {
+                    db_IFContext = db_IFContext
+                        .Where(s => nutricionistaIds.Contains(s.IdUser) || s.IdUser == usuario.Id);
+                }
+                else
+                {
+                    return NotFound();
                 }
             }
-            return View();
+            else if (roles.Contains("GerenteNutricionista"))
+            {
+                var nutricionistaIds = await GetUsersIdsByRoleNameAsync("Nutricionista");
+
+                if (nutricionistaIds != null)
+                {
+                    db_IFContext = db_IFContext
+                        .Where(s => nutricionistaIds.Contains(s.IdUser) || s.IdUser == usuario.Id);
+                }
+                else
+                {
+                    return NotFound();
+                }
+            }
+            else if (roles.Contains("Medico") || roles.Contains("Nutricionista"))
+            {
+                db_IFContext = db_IFContext
+                    .Where(s => s.IdUser == usuario.Id);
+            }
+            else
+            {
+                return Forbid();
+            }
+
+            var profissionais = await db_IFContext
+                .Select(pro => new ProfissionalResumido
+                {
+                    IdProfissional = pro.IdProfissional,
+                    Nome = pro.Nome,
+                    NomeCidade = pro.IdCidadeNavigation.Nome,
+                    NomePlano = pro.IdContratoNavigation.IdPlanoNavigation.Nome,
+                    Cpf = pro.Cpf,
+                    Especialidade = pro.Especialidade,
+                    Logradouro = pro.Logradouro,
+                    Numero = pro.Numero,
+                    Bairro = pro.Bairro,
+                    Cep = pro.Cep,
+                    Ddd1 = pro.Ddd1,
+                    Ddd2 = pro.Ddd2,
+                    Telefone1 = pro.Telefone1,
+                    Telefone2 = pro.Telefone2,
+                    Salario = pro.Salario,
+                })
+                .ToListAsync();
+
+            return View(profissionais);
         }
 
         // GET: TbProfissionais/Details/5
+        [Authorize(Roles = "Medico, Nutricionista")]
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
+            {
+                return NotFound();
+            }
+
+            var usuario = await _userManager.GetUserAsync(User);
+
+            if (usuario == null)
             {
                 return NotFound();
             }
@@ -117,7 +140,8 @@ namespace Projeto1_IF.Controllers
                 .Include(t => t.IdContratoNavigation)
                 .Include(t => t.IdTipoAcessoNavigation)
                 .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.IdProfissional == id);
+                .FirstOrDefaultAsync(m => m.IdProfissional == id && m.IdUser == usuario.Id);
+
             if (tbProfissional == null)
             {
                 return NotFound();
@@ -199,6 +223,7 @@ namespace Projeto1_IF.Controllers
         }
 
         // GET: TbProfissionais/Edit/5
+        [Authorize(Roles = "Medico, Nutricionista")]
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -206,7 +231,17 @@ namespace Projeto1_IF.Controllers
                 return RedirectToAction("Erro", "Home");
             }
 
-            var tbProfissional = await _context.TbProfissional.Include(t => t.IdContratoNavigation).FirstOrDefaultAsync(s => s.IdProfissional == id);
+            var usuario = await _userManager.GetUserAsync(User);
+
+            if (usuario == null)
+            {
+                return NotFound();
+            }
+
+            var tbProfissional = await _context.TbProfissional
+                .Include(t => t.IdContratoNavigation)
+                .FirstOrDefaultAsync(m => m.IdProfissional == id && m.IdUser == usuario.Id);
+
             if (tbProfissional == null)
             {
                 return NotFound();
@@ -223,6 +258,7 @@ namespace Projeto1_IF.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost, ActionName("Edit")]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Medico, Nutricionista")]
         public async Task<IActionResult> EditPost(int? id)
         {
             if (id == null)
@@ -230,7 +266,17 @@ namespace Projeto1_IF.Controllers
                 return NotFound();
             }
 
-            var tbProfissional = await _context.TbProfissional.Include(t => t.IdContratoNavigation).FirstOrDefaultAsync(s => s.IdProfissional == id);
+            var usuario = await _userManager.GetUserAsync(User);
+
+            if (usuario == null)
+            {
+                return NotFound();
+            }
+
+            var tbProfissional = await _context.TbProfissional
+                .Include(t => t.IdContratoNavigation)
+                .FirstOrDefaultAsync(m => m.IdProfissional == id && m.IdUser == usuario.Id);
+
             if ( tbProfissional == null)
             {
                 return NotFound();
@@ -265,6 +311,7 @@ namespace Projeto1_IF.Controllers
         }
 
         // GET: TbProfissionais/Delete/5
+        [Authorize(Roles = "GerenteGeral, GerenteMedico, GerenteNutricionista")]
         public async Task<IActionResult> Delete(int? id, bool? saveChangesError = false)
         {
             if (id == null)
@@ -299,9 +346,11 @@ namespace Projeto1_IF.Controllers
         // POST: TbProfissionais/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "GerenteGeral, GerenteMedico, GerenteNutricionista")]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var tbProfissional = await _context.TbProfissional.FindAsync(id);
+
             if (tbProfissional == null)
             {
                 return RedirectToAction(nameof(Index));
@@ -323,6 +372,21 @@ namespace Projeto1_IF.Controllers
         private bool TbProfissionalExists(int id)
         {
             return _context.TbProfissional.Any(e => e.IdProfissional == id);
+        }
+
+        private async Task<List<string>?> GetUsersIdsByRoleNameAsync(string roleName)
+        {
+            var role = await _identity.Roles.SingleOrDefaultAsync(r => r.Name == roleName);
+
+            if (role != null)
+            {
+                return await _identity.UserRoles
+                    .Where(ur => ur.RoleId == role.Id)
+                    .Select(ur => ur.UserId)
+                    .ToListAsync();
+            }
+ 
+            return null;
         }
     }
 }

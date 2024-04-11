@@ -141,7 +141,7 @@ namespace Projeto1_IF.Areas.Identity.Pages.Account
                         _logger.LogInformation("User created a new account with password.");
 
                         // Atribuir a role específica ao usuário
-                        await _userManager.AddToRoleAsync(user, "Médico");
+                        await _userManager.AddToRoleAsync(user, "Medico");
 
                         Input.tbProfissional.IdContratoNavigation.DataInicio = DateTime.UtcNow;
                         Input.tbProfissional.IdContratoNavigation.DataFim = Input.tbProfissional.IdContratoNavigation.DataInicio.Value.AddMonths(1);
