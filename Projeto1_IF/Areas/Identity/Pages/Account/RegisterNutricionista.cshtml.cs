@@ -189,7 +189,10 @@ namespace Projeto1_IF.Areas.Identity.Pages.Account
                 ModelState.AddModelError("", "Erro Geral. " + ex.ToString());
             }
 
-            // If we got this far, something failed, redisplay form
+            ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "Nome");
+            ViewData["IdPlano"] = new SelectList(_context.TbPlano, "IdPlano", "Nome");
+            ViewData["IdTipoAcesso"] = new SelectList(_context.TbTipoAcesso, "IdTipoAcesso", "Nome");
+
             return Page();
         }
 

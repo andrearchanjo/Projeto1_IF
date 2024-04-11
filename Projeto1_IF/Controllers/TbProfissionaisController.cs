@@ -39,7 +39,6 @@ namespace Projeto1_IF.Controllers
             Nutricionista = 3,
         }
 
-        // GET: TbProfissionais
         [Authorize(Roles = "Medico, Nutricionista, GerenteGeral, GerenteMedico, GerenteNutricionista")]
         public async Task<IActionResult> Index()
         {
@@ -50,50 +49,10 @@ namespace Projeto1_IF.Controllers
                 return View();
             }
 
-            var roles = await _userManager.GetRolesAsync(usuario);
+            IQueryable<TbProfissional> db_IFContext = _context.TbProfissional.AsQueryable()
+                .AsNoTracking();
 
-            IQueryable<TbProfissional> db_IFContext = _context.TbProfissional.AsQueryable();
-
-            if (roles.Contains("GerenteGeral"))
-            {
-            }
-            else if (roles.Contains("GerenteMedico"))
-            {
-                var nutricionistaIds = await GetUsersIdsByRoleNameAsync("Medico");
-
-                if (nutricionistaIds != null)
-                {
-                    db_IFContext = db_IFContext
-                        .Where(s => nutricionistaIds.Contains(s.IdUser) || s.IdUser == usuario.Id);
-                }
-                else
-                {
-                    return NotFound();
-                }
-            }
-            else if (roles.Contains("GerenteNutricionista"))
-            {
-                var nutricionistaIds = await GetUsersIdsByRoleNameAsync("Nutricionista");
-
-                if (nutricionistaIds != null)
-                {
-                    db_IFContext = db_IFContext
-                        .Where(s => nutricionistaIds.Contains(s.IdUser) || s.IdUser == usuario.Id);
-                }
-                else
-                {
-                    return NotFound();
-                }
-            }
-            else if (roles.Contains("Medico") || roles.Contains("Nutricionista"))
-            {
-                db_IFContext = db_IFContext
-                    .Where(s => s.IdUser == usuario.Id);
-            }
-            else
-            {
-                return Forbid();
-            }
+            db_IFContext = await AplicaFiltroProfissional(db_IFContext, usuario);
 
             var profissionais = await db_IFContext
                 .Select(pro => new ProfissionalResumido
@@ -119,8 +78,7 @@ namespace Projeto1_IF.Controllers
             return View(profissionais);
         }
 
-        // GET: TbProfissionais/Details/5
-        [Authorize(Roles = "Medico, Nutricionista")]
+        [Authorize(Roles = "Medico, Nutricionista, GerenteGeral, GerenteMedico, GerenteNutricionista")]
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -135,12 +93,15 @@ namespace Projeto1_IF.Controllers
                 return NotFound();
             }
 
-            var tbProfissional = await _context.TbProfissional
+            IQueryable<TbProfissional> tbProfissionalQuery = _context.TbProfissional.AsQueryable()
                 .Include(t => t.IdCidadeNavigation)
                 .Include(t => t.IdContratoNavigation)
                 .Include(t => t.IdTipoAcessoNavigation)
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.IdProfissional == id && m.IdUser == usuario.Id);
+                .AsNoTracking();
+
+            tbProfissionalQuery = await AplicaFiltroProfissional(tbProfissionalQuery, usuario);
+
+            var tbProfissional = await tbProfissionalQuery.FirstOrDefaultAsync(m => m.IdProfissional == id);
 
             if (tbProfissional == null)
             {
@@ -150,80 +111,75 @@ namespace Projeto1_IF.Controllers
             return View(tbProfissional);
         }
 
-        // GET: TbProfissionais/Create
-        public IActionResult Create()
-        {
-            ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "Nome");
-            ViewData["IdPlano"] = new SelectList(_context.TbPlano, "IdPlano", "Nome");
-            ViewData["IdTipoAcesso"] = new SelectList(_context.TbTipoAcesso, "IdTipoAcesso", "Nome");
-            return View();
-        }
+        //public IActionResult Create()
+        //{
+        //    ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "Nome");
+        //    ViewData["IdPlano"] = new SelectList(_context.TbPlano, "IdPlano", "Nome");
+        //    ViewData["IdTipoAcesso"] = new SelectList(_context.TbTipoAcesso, "IdTipoAcesso", "Nome");
+        //    return View();
+        //}
 
-        // POST: TbProfissionais/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("IdTipoProfissional,IdTipoAcesso,IdCidade,IdUser,Nome,Cpf,CrmCrn,Especialidade,Logradouro,Numero,Bairro,Cep,Ddd1,Ddd2,Telefone1,Telefone2,Salario")] TbProfissional tbProfissional, [Bind("IdPlano")] TbContrato IdContratoNavigation)
-        {
-            try
-            {
-                ModelState.Remove("IdUser");
-                ModelState.Remove("IdContrato");
-                if (ModelState.IsValid)
-                {
-                    IdContratoNavigation.DataInicio = DateTime.UtcNow;
-                    IdContratoNavigation.DataFim = IdContratoNavigation.DataInicio.Value.AddMonths(1);
-                    _context.Add(IdContratoNavigation);
-                    await _context.SaveChangesAsync();
+        //[HttpPost]
+        //[ValidateAntiForgeryToken]
+        //public async Task<IActionResult> Create([Bind("IdTipoProfissional,IdTipoAcesso,IdCidade,IdUser,Nome,Cpf,CrmCrn,Especialidade,Logradouro,Numero,Bairro,Cep,Ddd1,Ddd2,Telefone1,Telefone2,Salario")] TbProfissional tbProfissional, [Bind("IdPlano")] TbContrato IdContratoNavigation)
+        //{
+        //    try
+        //    {
+        //        ModelState.Remove("IdUser");
+        //        ModelState.Remove("IdContrato");
+        //        if (ModelState.IsValid)
+        //        {
+        //            IdContratoNavigation.DataInicio = DateTime.UtcNow;
+        //            IdContratoNavigation.DataFim = IdContratoNavigation.DataInicio.Value.AddMonths(1);
+        //            _context.Add(IdContratoNavigation);
+        //            await _context.SaveChangesAsync();
 
-                    var userManager = HttpContext.RequestServices.GetService<UserManager<IdentityUser>>();
-                    if (userManager != null)
-                    {
-                        var email = User.Identity?.Name;
-                        if (email != null)
-                        {
-                            var user = await userManager.FindByEmailAsync(email);
-                            if (user != null)
-                            {
-                                tbProfissional.IdUser = user.Id;
-                            }
-                            else
-                            {
-                                return NotFound();
-                            }
-                        }
-                        else
-                        {
-                            return NotFound();
-                        }
-                    }
-                    else
-                    {
-                        return NotFound();
-                    }
+        //            var userManager = HttpContext.RequestServices.GetService<UserManager<IdentityUser>>();
+        //            if (userManager != null)
+        //            {
+        //                var email = User.Identity?.Name;
+        //                if (email != null)
+        //                {
+        //                    var user = await userManager.FindByEmailAsync(email);
+        //                    if (user != null)
+        //                    {
+        //                        tbProfissional.IdUser = user.Id;
+        //                    }
+        //                    else
+        //                    {
+        //                        return NotFound();
+        //                    }
+        //                }
+        //                else
+        //                {
+        //                    return NotFound();
+        //                }
+        //            }
+        //            else
+        //            {
+        //                return NotFound();
+        //            }
 
-                    tbProfissional.IdContrato = IdContratoNavigation.IdContrato;
-                    _context.Add(tbProfissional);
-                    await _context.SaveChangesAsync();
-                    return RedirectToAction(nameof(Index));
-                }
-            } catch (DbUpdateException dex)
-            {
-                ModelState.AddModelError("", "Incapaz de salvar. " + dex.ToString());
-            } catch (Exception ex)
-            {
-                ModelState.AddModelError("", "Erro geral. " + ex.ToString());
-            }
+        //            tbProfissional.IdContrato = IdContratoNavigation.IdContrato;
+        //            _context.Add(tbProfissional);
+        //            await _context.SaveChangesAsync();
+        //            return RedirectToAction(nameof(Index));
+        //        }
+        //    } catch (DbUpdateException dex)
+        //    {
+        //        ModelState.AddModelError("", "Incapaz de salvar. " + dex.ToString());
+        //    } catch (Exception ex)
+        //    {
+        //        ModelState.AddModelError("", "Erro geral. " + ex.ToString());
+        //    }
             
-            ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "Nome", tbProfissional.IdCidade);
-            ViewData["IdPlano"] = new SelectList(_context.TbPlano, "IdPlano", "Nome", IdContratoNavigation.IdPlano);
-            ViewData["IdTipoAcesso"] = new SelectList(_context.TbTipoAcesso, "IdTipoAcesso", "Nome", tbProfissional.IdTipoAcesso);
-            return View(tbProfissional);
-        }
+        //    ViewData["IdCidade"] = new SelectList(_context.TbCidade, "IdCidade", "Nome", tbProfissional.IdCidade);
+        //    ViewData["IdPlano"] = new SelectList(_context.TbPlano, "IdPlano", "Nome", IdContratoNavigation.IdPlano);
+        //    ViewData["IdTipoAcesso"] = new SelectList(_context.TbTipoAcesso, "IdTipoAcesso", "Nome", tbProfissional.IdTipoAcesso);
+        //    return View(tbProfissional);
+        //}
 
-        // GET: TbProfissionais/Edit/5
-        [Authorize(Roles = "Medico, Nutricionista")]
+        [Authorize(Roles = "Medico, Nutricionista, GerenteGeral, GerenteMedico, GerenteNutricionista")]
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -238,9 +194,16 @@ namespace Projeto1_IF.Controllers
                 return NotFound();
             }
 
-            var tbProfissional = await _context.TbProfissional
+            IQueryable<TbProfissional> tbProfissionalQuery = _context.TbProfissional.AsQueryable()
+                .Include(t => t.IdCidadeNavigation)
                 .Include(t => t.IdContratoNavigation)
-                .FirstOrDefaultAsync(m => m.IdProfissional == id && m.IdUser == usuario.Id);
+                .Include(t => t.IdTipoAcessoNavigation);
+
+            tbProfissionalQuery = await AplicaFiltroProfissional(tbProfissionalQuery, usuario);
+
+            var tbProfissional = await tbProfissionalQuery
+                .Include(t => t.IdContratoNavigation)
+                .FirstOrDefaultAsync(m => m.IdProfissional == id);
 
             if (tbProfissional == null)
             {
@@ -253,12 +216,9 @@ namespace Projeto1_IF.Controllers
             return View(tbProfissional);
         }
 
-        // POST: TbProfissionais/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost, ActionName("Edit")]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = "Medico, Nutricionista")]
+        [Authorize(Roles = "Medico, Nutricionista, GerenteGeral, GerenteMedico, GerenteNutricionista")]
         public async Task<IActionResult> EditPost(int? id)
         {
             if (id == null)
@@ -273,24 +233,53 @@ namespace Projeto1_IF.Controllers
                 return NotFound();
             }
 
-            var tbProfissional = await _context.TbProfissional
+            IQueryable<TbProfissional> tbProfissionalQuery = _context.TbProfissional.AsQueryable()
+                .Include(t => t.IdCidadeNavigation)
                 .Include(t => t.IdContratoNavigation)
-                .FirstOrDefaultAsync(m => m.IdProfissional == id && m.IdUser == usuario.Id);
+                .Include(t => t.IdTipoAcessoNavigation);
 
-            if ( tbProfissional == null)
+            tbProfissionalQuery = await AplicaFiltroProfissional(tbProfissionalQuery, usuario);
+
+            var tbProfissional = await tbProfissionalQuery
+                .Include(t => t.IdContratoNavigation)
+                .FirstOrDefaultAsync(m => m.IdProfissional == id);
+
+            if (tbProfissional == null)
             {
                 return NotFound();
             }
 
+            var cpf = tbProfissional.Cpf;
+
+            var isGerente = User.IsInRole("GerenteGeral") || User.IsInRole("GerenteMedico") || User.IsInRole("GerenteNutricionista");
+
             if (await TryUpdateModelAsync<TbProfissional>(
                 tbProfissional,
                 "",
-                s => s.IdProfissional, s => s.IdTipoAcesso, s => s.IdCidade, s => s.Nome, s => s.Cpf, s => s.CrmCrn,
-                s => s.Especialidade, s => s.Logradouro, s => s.Numero, s => s.Bairro, s => s.Cep,
-                s => s.Ddd1, s => s.Ddd2, s => s.Telefone1, s => s.Telefone2, s => s.Salario))
+                s => s.IdProfissional,
+                s => s.IdTipoAcesso,
+                s => s.IdCidade,
+                s => s.Nome,
+                s => s.Cpf,
+                s => s.CrmCrn,
+                s => s.Especialidade,
+                s => s.Logradouro,
+                s => s.Numero,
+                s => s.Bairro,
+                s => s.Cep,
+                s => s.Ddd1,
+                s => s.Ddd2,
+                s => s.Telefone1,
+                s => s.Telefone2,
+                s => s.Salario))
             {
                 try
                 {
+                    if (!isGerente)
+                    {
+                        tbProfissional.Cpf = cpf;
+                    }
+
                     await _context.SaveChangesAsync();
                     return RedirectToAction(nameof(Index));
                 }
@@ -319,13 +308,18 @@ namespace Projeto1_IF.Controllers
                 return NotFound();
             }
 
-            var tbProfissional = await _context.TbProfissional
-                .Include(t => t.IdCidadeNavigation)
-                .ThenInclude(s => s.IdEstadoNavigation)
-                .Include(t => t.IdTipoAcessoNavigation)
-                .Include(t => t.IdContratoNavigation)
-                .ThenInclude(s => s.IdPlanoNavigation)
-                .AsNoTracking()
+            var usuario = await _userManager.GetUserAsync(User);
+
+            if (usuario == null)
+            {
+                return NotFound();
+            }
+
+            IQueryable<TbProfissional> tbProfissionalQuery = _context.TbProfissional.AsQueryable();
+
+            tbProfissionalQuery = await AplicaFiltroProfissional(tbProfissionalQuery, usuario);
+
+            var tbProfissional = await tbProfissionalQuery
                 .FirstOrDefaultAsync(m => m.IdProfissional == id);
 
             if (tbProfissional == null)
@@ -343,13 +337,24 @@ namespace Projeto1_IF.Controllers
             return View(tbProfissional);
         }
 
-        // POST: TbProfissionais/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "GerenteGeral, GerenteMedico, GerenteNutricionista")]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var tbProfissional = await _context.TbProfissional.FindAsync(id);
+            var usuario = await _userManager.GetUserAsync(User);
+
+            if (usuario == null)
+            {
+                return NotFound();
+            }
+
+            IQueryable<TbProfissional> tbProfissionalQuery = _context.TbProfissional.AsQueryable()
+;
+            tbProfissionalQuery = await AplicaFiltroProfissional(tbProfissionalQuery, usuario);
+
+            var tbProfissional = await tbProfissionalQuery
+                .FirstOrDefaultAsync(m => m.IdProfissional == id);
 
             if (tbProfissional == null)
             {
@@ -364,7 +369,6 @@ namespace Projeto1_IF.Controllers
             }
             catch (DbUpdateException /* ex */)
             {
-                //Log the error (uncomment ex variable name and write a log.)
                 return RedirectToAction(nameof(Delete), new { id = id, saveChangesError = true });
             }
         }
@@ -372,6 +376,54 @@ namespace Projeto1_IF.Controllers
         private bool TbProfissionalExists(int id)
         {
             return _context.TbProfissional.Any(e => e.IdProfissional == id);
+        }
+
+        private async Task<IQueryable<TbProfissional>> AplicaFiltroProfissional(IQueryable<TbProfissional> query, IdentityUser usuario)
+        {
+            var roles = await _userManager.GetRolesAsync(usuario);
+
+            if (roles.Contains("GerenteGeral"))
+            {
+            }
+            else if (roles.Contains("GerenteMedico"))
+            {
+                var medicoIds = await GetUsersIdsByRoleNameAsync("Medico");
+
+                if (medicoIds != null)
+                {
+                    query = query
+                        .Where(s => medicoIds.Contains(s.IdUser) || s.IdUser == usuario.Id);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Erro ao obter IDs de médicos.");
+                }
+            }
+            else if (roles.Contains("GerenteNutricionista"))
+            {
+                var nutricionistaIds = await GetUsersIdsByRoleNameAsync("Nutricionista");
+
+                if (nutricionistaIds != null)
+                {
+                    query = query
+                        .Where(s => nutricionistaIds.Contains(s.IdUser) || s.IdUser == usuario.Id);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Erro ao obter IDs de nutricionistas.");
+                }
+            }
+            else if (roles.Contains("Medico") || roles.Contains("Nutricionista"))
+            {
+                query = query
+                    .Where(s => s.IdUser == usuario.Id);
+            }
+            else
+            {
+                throw new InvalidOperationException("Usuário sem permissão para visualizar profissionais.");
+            }
+
+            return query;
         }
 
         private async Task<List<string>?> GetUsersIdsByRoleNameAsync(string roleName)

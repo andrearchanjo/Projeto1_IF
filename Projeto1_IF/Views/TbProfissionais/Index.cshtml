@@ -5,11 +5,8 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<h1>Index</h1>
+<h1>Lista de Profissionais</h1>
 
-<p>
-    <a asp-action="Create">Create New</a>
-</p>
 <table class="table">
     <thead>
         <tr>
@@ -112,18 +109,12 @@
             <td>
                 <a asp-action="Edit" asp-route-id="@item.IdProfissional" class="btn btn-primary">Editar</a> |
                 <a asp-action="Details" asp-route-id="@item.IdProfissional" class="btn btn-primary">Detalhes</a> |
-                <a asp-action="Delete" asp-route-id="@item.IdProfissional" class="btn btn-primary">Excluir</a>
+                @if (User.IsInRole("GerenteGeral") || User.IsInRole("GerenteMedico") || User.IsInRole("GerenteNutricionista"))
+                {
+                    <a asp-action="Delete" asp-route-id="@item.IdProfissional" class="btn btn-primary">Excluir</a>
+                }
             </td>
         </tr>
 }
     </tbody>
 </table>
-
-@* @if (Model.Count() > 1)
-{
-    <ol class="nav nav-pills">
-        <li class="nav-item">
-            <a asp-action="Delete" asp-route-id="@Model.First().IdProfissional" class="btn btn-primary">><i class="bi-alarm"></i>Delete</a>
-        </li>
-    </ol>
-} *@

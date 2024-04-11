@@ -46,7 +46,14 @@
             </div>
             <div class="form-group">
                 <label asp-for="Cpf" class="control-label"></label>
-                <input asp-for="Cpf" class="form-control" />
+                @if (User.IsInRole("GerenteGeral") || User.IsInRole("GerenteMedico") || User.IsInRole("GerenteNutricionista"))
+                {
+                    <input asp-for="Cpf" class="form-control" />
+                }
+                else
+                {
+                    <span>@Model.Cpf</span>
+                }
                 <span asp-validation-for="Cpf" class="text-danger"></span>
             </div>
             <div class="form-group">
