@@ -349,27 +349,73 @@ namespace Projeto1_IF.Controllers
                 return NotFound();
             }
 
-            IQueryable<TbProfissional> tbProfissionalQuery = _context.TbProfissional.AsQueryable()
-;
-            tbProfissionalQuery = await AplicaFiltroProfissional(tbProfissionalQuery, usuario);
-
-            var tbProfissional = await tbProfissionalQuery
-                .FirstOrDefaultAsync(m => m.IdProfissional == id);
-
-            if (tbProfissional == null)
+            using (var transaction = _context.Database.BeginTransaction())
             {
-                return RedirectToAction(nameof(Index));
-            }
+                try
+                {
+                    IQueryable<TbProfissional> tbProfissionalQuery = _context.TbProfissional
+                        .AsQueryable();
+                    tbProfissionalQuery = await AplicaFiltroProfissional(tbProfissionalQuery, usuario);
 
-            try
-            {
-                _context.TbProfissional.Remove(tbProfissional);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
-            }
-            catch (DbUpdateException /* ex */)
-            {
-                return RedirectToAction(nameof(Delete), new { id = id, saveChangesError = true });
+                    var tbProfissional = await tbProfissionalQuery
+                        .FirstOrDefaultAsync(m => m.IdProfissional == id);
+
+                    if (tbProfissional == null)
+                    {
+                        return RedirectToAction(nameof(Index));
+                    }
+
+                    var pacientesDoProfissional = await _context.TbMedicoPaciente
+                        .Where(mp => mp.IdProfissional == id)
+                        .Select(mp => mp.IdPaciente)
+                        .ToListAsync();
+
+                    foreach (var pacienteId in pacientesDoProfissional)
+                    {
+                        var tbMedicoPaciente = await _context.TbMedicoPaciente
+                                .FirstOrDefaultAsync(mp => mp.IdPaciente == pacienteId && mp.IdProfissional == id);
+
+                        var numProfissionaisVinculados = await _context.TbMedicoPaciente
+                            .CountAsync(mp => mp.IdPaciente == pacienteId);
+
+                        if (tbMedicoPaciente != null)
+                        {
+                            _context.TbMedicoPaciente.Remove(tbMedicoPaciente);
+                        }
+
+                        if (numProfissionaisVinculados == 1)
+                        {
+                            var paciente = await _context.TbPaciente.FindAsync(pacienteId);
+
+                            if (paciente != null)
+                            {
+                                _context.TbPaciente.Remove(paciente);
+                            }
+                        }
+                    }
+
+                    _context.TbProfissional.Remove(tbProfissional);
+                    var userId = tbProfissional.IdUser;
+
+                    var user = await _identity.Users
+                        .FirstOrDefaultAsync(x => x.Id == userId);
+
+                    if (user != null)
+                    {
+                        _identity.Users.Remove(user);
+                    }
+
+                    await _context.SaveChangesAsync();
+
+                    transaction.Commit();
+
+                    return RedirectToAction(nameof(Index));
+                }
+                catch (Exception ex)
+                {
+                    transaction.Rollback();
+                    return RedirectToAction(nameof(Delete), new { id = id, saveChangesError = true });
+                }
             }
         }
 

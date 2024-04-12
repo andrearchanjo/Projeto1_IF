@@ -26,12 +26,18 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="tbProfissionais" asp-action="Index">Profissionais</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="tbPacientes" asp-action="Index">Pacientes</a>
-                        </li>
+                        @if (User?.Identity != null && User.Identity.IsAuthenticated)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="tbProfissionais" asp-action="Index">Profissionais</a>
+                            </li>
+                            @if (User.IsInRole("Medico") || User.IsInRole("Nutricionista"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="tbPacientes" asp-action="Index">Pacientes</a>
+                                </li>
+                            }
+                        }
                     </ul>
                     <partial name="_LoginPartial" />
                 </div>
